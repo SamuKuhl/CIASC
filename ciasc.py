@@ -1,7 +1,7 @@
 import streamlit as st
 
 def calculator():
-    st.title("Calculadora Simples")
+    st.title("Calculadora")
 
     num1 = st.number_input("Digite o primeiro número:")
     operation = st.selectbox("Selecione a operação:", ["+", "-", "*", "/"])
