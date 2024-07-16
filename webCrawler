@@ -1,0 +1,97 @@
+import os
+import requests
+from urllib.parse import urljoin, urlparse
+from bs4 import BeautifulSoup
+
+def extract_page_content(url):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                      '(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.text
+    else:
+        print(f"Error accessing page: {response.status_code}")
+        return None
+
+def extract_resources(url):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                      '(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        resources = {
+            'html': response.text,
+            'css': extract_css_content(soup),
+            'js': extract_js_content(url, soup),
+            'images': extract_images(url, soup)
+        }
+        return resources
+    else:
+        print(f"Error accessing page: {response.status_code}")
+        return None
+
+def extract_css_content(soup):
+    css_content = ""
+    styles = soup.find_all('style')
+    for style in styles:
+        css_content += style.string + "\n"
+    return css_content
+
+def extract_js_content(base_url, soup):
+    js_content = ""
+    scripts = soup.find_all('script')
+    for script in scripts:
+        if script.has_attr('src'):
+            js_url = urljoin(base_url, script['src'])
+            js_response = requests.get(js_url)
+            if js_response.status_code == 200:
+                js_content += js_response.text + "\n"
+        else:
+            js_content += script.string + "\n"
+    return js_content
+
+def extract_images(base_url, soup):
+    images = []
+    img_tags = soup.find_all('img')
+    for img in img_tags:
+        img_url = urljoin(base_url, img['src'])
+        
+        # Extract filename from URL without query parameters
+        parsed_url = urlparse(img_url)
+        img_name = os.path.basename(parsed_url.path)
+        
+        # If img_name is empty after extracting basename, use a default filename
+        if not img_name:
+            img_name = 'image.jpg'
+        
+        images.append({'url': img_url, 'filename': img_name})
+        
+        # Download the image
+        img_response = requests.get(img_url)
+        if img_response.status_code == 200:
+            with open(img_name, 'wb') as img_file:
+                img_file.write(img_response.content)
+            print(f"Image '{img_name}' saved successfully.")
+        else:
+            print(f"Error downloading image: {img_response.status_code}")
+    
+    return images
+
+def save_to_file(content, filename):
+    with open(filename, 'w', encoding='utf-8') as file:
+        file.write(content)
+    print(f"File '{filename}' saved successfully.")
+
+if __name__ == "__main__":
+    url = input("Enter the URL of the page you want to extract: ")
+    
+    resources = extract_resources(url)
+    if resources:
+        save_to_file(resources['html'], "page.html")
+        save_to_file(resources['css'], "styles.css")
+        save_to_file(resources['js'], "script.js")
+        # Optionally, save images to files or handle them as downloaded
